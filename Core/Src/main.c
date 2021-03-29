@@ -378,11 +378,11 @@ void encoderSpeedReaderCycle() {
 	//calculate diff from all buffer
 	for(register int i=0 ;i < CAPTURENUM-1;i++)
 	{
-		DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];
+		DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];  // next - now
 		//time never go back, but timer can over flow , conpensate that
 		if (DiffTime[i] <0)
 		{
-			DiffTime[i]+=65535;
+			DiffTime[i]+=65535;  // prevent negative
 		}
 		//Sum all 15 Diff
 		sum += DiffTime[i];

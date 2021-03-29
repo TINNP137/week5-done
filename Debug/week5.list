@@ -1077,7 +1077,7 @@ void encoderSpeedReaderCycle() {
  8000908:	2400      	movs	r4, #0
  800090a:	e02b      	b.n	8000964 <encoderSpeedReaderCycle+0x74>
 	{
-		DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];
+		DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];  // next - now
  800090c:	4622      	mov	r2, r4
  800090e:	683b      	ldr	r3, [r7, #0]
  8000910:	4413      	add	r3, r2
@@ -1102,7 +1102,7 @@ void encoderSpeedReaderCycle() {
  800093e:	2b00      	cmp	r3, #0
  8000940:	da08      	bge.n	8000954 <encoderSpeedReaderCycle+0x64>
 		{
-			DiffTime[i]+=65535;
+			DiffTime[i]+=65535;  // prevent negative
  8000942:	4b14      	ldr	r3, [pc, #80]	; (8000994 <encoderSpeedReaderCycle+0xa4>)
  8000944:	f853 3024 	ldr.w	r3, [r3, r4, lsl #2]
  8000948:	f503 437f 	add.w	r3, r3, #65280	; 0xff00
