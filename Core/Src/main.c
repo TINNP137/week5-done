@@ -61,6 +61,7 @@ uint32_t capturedata[CAPTURENUM] = { 0 };
 int32_t DiffTime[CAPTURENUM-1] = { 0 };
 //Mean difftime
 float MeanTime =0;
+float RPM =0;
 
 
 
@@ -513,6 +514,7 @@ void encoderSpeedReaderCycle() {
 
     //mean all 15 Diff
     MeanTime =sum / (float)(CAPTURENUM-1);
+    RPM =60000000/(12*64*MeanTime);
 }
 uint64_t micros()
 {
