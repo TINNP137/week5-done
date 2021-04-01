@@ -47,6 +47,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim11;
 DMA_HandleTypeDef hdma_tim1_ch1;
+DMA_HandleTypeDef hdma_tim2_ch1;
+DMA_HandleTypeDef hdma_tim5_ch1;
 
 UART_HandleTypeDef huart2;
 
@@ -54,7 +56,7 @@ UART_HandleTypeDef huart2;
 
 //12 P/R , Gear reduction 1 : 64
 //DMA Buffer
-uint16_t capturedata[CAPTURENUM] = { 0 };
+uint32_t capturedata[CAPTURENUM] = { 0 };
 //diff time of capture data
 int32_t DiffTime[CAPTURENUM-1] = { 0 };
 //Mean difftime
@@ -122,32 +124,32 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-  	  //start Microsec timer
-	HAL_TIM_Base_Start_IT(&htim11);
-	//start Input capture in DMA
-	HAL_TIM_Base_Start(&htim1);
-	HAL_TIM_IC_Start_DMA(&htim1, TIM_CHANNEL_1, (uint32_t*)capturedata,
-			CAPTURENUM);
-	uint64_t timestamp =0;
+      //start Microsec timer
+    HAL_TIM_Base_Start_IT(&htim5);
+    //start Input capture in DMA
+    HAL_TIM_Base_Start(&htim2);
+    HAL_TIM_IC_Start_DMA(&htim2, TIM_CHANNEL_1, (uint32_t*)capturedata,
+            CAPTURENUM);
+    uint64_t timestamp =0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	while (1) {
-		//read Time of encoder
-		encoderSpeedReaderCycle();
+    while (1) {
+        //read Time of encoder
+        encoderSpeedReaderCycle();
 
-		if(micros()-timestamp > 100000) //0.5hz use 2000000 micro s   // 200000 micro s use 5hz
-		{
-			timestamp = micros();
-			HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
-		}
+        if(micros()-timestamp > 100000) //0.5 hz use t = 2000000 microsec = 2sec  //  5 hz  t= 0.2 sec = 200000microsec
+        {
+            timestamp = micros();
+            HAL_GPIO_TogglePin(LD2_GPIO_Port,LD2_Pin);
+        }
 
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	}
+    }
   /* USER CODE END 3 */
 }
 
@@ -274,7 +276,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
+  htim2.Init.Prescaler = 99;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 4294967295;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -301,8 +303,8 @@ static void MX_TIM2_Init(void)
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-  sConfigIC.ICFilter = 0;
-  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
+  sConfigIC.ICFilter = 2;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -332,7 +334,7 @@ static void MX_TIM5_Init(void)
 
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 0;
+  htim5.Init.Prescaler = 99;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim5.Init.Period = 4294967295;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -442,8 +444,15 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
@@ -485,36 +494,36 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void encoderSpeedReaderCycle() {
-	//get DMA Position form number of data
-	uint32_t CapPos =CAPTURENUM -  __HAL_DMA_GET_COUNTER(htim1.hdma[TIM_DMA_ID_CC1]);  //capture num - unfilled
-	uint32_t sum = 0 ;
+    //get DMA Position form number of data
+    uint32_t CapPos =CAPTURENUM -  __HAL_DMA_GET_COUNTER(htim2.hdma[TIM_DMA_ID_CC1]);  //capture num - unfilled
+    uint32_t sum = 0 ;
 
-	//calculate diff from all buffer
-	for(register int i=0 ;i < CAPTURENUM-1;i++)
-	{
-		DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];  // next - now
-		//time never go back, but timer can over flow , conpensate that
-		if (DiffTime[i] <0)
-		{
-			DiffTime[i]+=65535;  // prevent negative
-		}
-		//Sum all 15 Diff
-		sum += DiffTime[i];
-	}
+    //calculate diff from all buffer
+    for(register int i=0 ;i < CAPTURENUM-1;i++)
+    {
+        DiffTime[i]  = capturedata[(CapPos+1+i)%CAPTURENUM]-capturedata[(CapPos+i)%CAPTURENUM];  // next - now
+        //time never go back, but timer can over flow , conpensate that
+        if (DiffTime[i] <0)
+        {
+            DiffTime[i]+=4294967295;  // prevent negative
+        }
+        //Sum all 15 Diff
+        sum += DiffTime[i];
+    }
 
-	//mean all 15 Diff
-	MeanTime =sum / (float)(CAPTURENUM-1);
+    //mean all 15 Diff
+    MeanTime =sum / (float)(CAPTURENUM-1);
 }
 uint64_t micros()
 {
-	return _micros + htim11.Instance->CNT;
+    return _micros + htim5.Instance->CNT;
 }
 //interupt
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
- if(htim == &htim11)
+ if(htim == &htim5)
  {
-	 _micros += 65535;
+     _micros += 4294967295;
  }
 }
 /* USER CODE END 4 */
@@ -526,10 +535,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1) {
-	}
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1) {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 
